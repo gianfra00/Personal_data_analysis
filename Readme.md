@@ -6,62 +6,62 @@
 Download and install Miniconda from here https://conda.io/miniconda.html
 >conda create -n py36 numpy pandas python=3.6 (or python 2.7)
 
-####install kernel for jupyter in the current env
+#### install kernel for jupyter in the current env
 >pip install ipykernel
 
-####install ipython kernel
+#### install ipython kernel
 >ipython kernel install --user --name=projectname
 
-####At this point, you can start jupyter:
+#### At this point, you can start jupyter:
 >jupyter notebook
 
-####create a new notebook and select the kernel that lives inside your environment.
+#### create a new notebook and select the kernel that lives inside your environment.
 
-##install further needed lib
+## install further needed lib
 
-###inside your env:
+### inside your env:
 
-####install bs4:
+#### install bs4:
 >pip install bs4
 
-####install sklearn:
+#### install sklearn:
 >pip install sklearn
 
-####install scipy:
+#### install scipy:
 >pip install scipy
 
-####install matplotlib:
+#### install matplotlib:
 >pip install matplotlib
 
-####install nltk:
+#### install nltk:
 >pip install nltk
 
-####install mediawiki:
+#### install mediawiki:
 >pip install pymediawiki
 
-####install geopy:
+#### install geopy:
 >pip install geopy
 
-####install html5 parser:
+#### install html5 parser:
 >pip install HTMLParser
 >pip install html5lib
 
-####create a jupyter notebook in the directory you putted the downloaded lib file and import
-##import class for analysis
+#### create a jupyter notebook in the directory you putted the downloaded lib file and import
+## import class for analysis
 >from lib.AnalysisClass import *
 
-####importclass for generating csv from facebook/google 
+#### importclass for generating csv from facebook/google 
 >from lib.CreateCsvClass import *
 
-##classes structure
+## classes structure
 
-###CreateCsvClass
+### CreateCsvClass
 
-#####converting google html files
+##### converting google html files
 >g=gCsvConverter('readingPath','writing path')
 >g.execute()
 
-#####converting facebook html files
+##### converting facebook html files
 >f=fCsvConverter('readingPath','writing path')
 >f.execute()
 
