@@ -2,7 +2,7 @@
 
 ## Install dependencies
 
-The following instrauction have been tested on a Ubuntu 16.04 enviroment.
+The following instrauction have been tested on a Ubuntu 16.04 environment.
 
 #### Install virtual enviroment
 Download and install Miniconda from here https://conda.io/miniconda.html
