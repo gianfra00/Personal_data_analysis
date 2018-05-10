@@ -1,6 +1,6 @@
 # Master Thesis - data analysis over personal data
 
-##Install dependencies
+## Install dependencies
 
 #### Install virtual enviroment
 Download and install Miniconda from here https://conda.io/miniconda.html
