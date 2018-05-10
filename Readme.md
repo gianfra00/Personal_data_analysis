@@ -68,9 +68,9 @@ Download and install Miniconda from here https://conda.io/miniconda.html
 readingPath= the directory path of your google data directory
 writingPath=directory where you want to save your csv
 
-###AnalysisClass
+### AnalysisClass
 
-####get google analysis
+#### get google analysis
 >gg=PersonalDataTopicAnalysis('readPath')
 >gg.execute()
 >gg.info_table('month','year')
