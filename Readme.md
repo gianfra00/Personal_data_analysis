@@ -2,6 +2,8 @@
 
 ## Install dependencies
 
+The following instrauction have been tested on a Ubuntu 16.04 enviroment.
+
 #### Install virtual enviroment
 Download and install Miniconda from here https://conda.io/miniconda.html
 >conda create -n py36 numpy pandas python=3.6 (or python 2.7)
