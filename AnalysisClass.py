@@ -1,5 +1,9 @@
 
 # coding: utf-8
+
+# In[1]:
+
+
 #All libraries and dependences
 
 import pandas as pd
@@ -15,19 +19,27 @@ from matplotlib import *
 import re
 import datetime
 import collections
-from time import time 
+from time import time
+import pyLDAvis
+import pyLDAvis.sklearn 
 import nltk
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.collocations import *
 import string
 nltk.download('stopwords')
+nltk.download('wordnet')
 from nltk.corpus import stopwords
+from nltk.corpus import wordnet
 from time import time
 #from sklearn.neighbors import KNeighborsClassifier
 from mediawiki import MediaWiki
 from mediawiki import DisambiguationError,PageError
 from collections import OrderedDict
 from geopy.geocoders import Nominatim
+
+
+# In[2]:
+
 
 #
 #Class used for splittid the time: the initial given format is year-month-day-time-> it generates a column for each of them
@@ -110,6 +122,9 @@ class get_splitted_time:
             return tempFrame
 
 
+# In[5]:
+
+
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
 #topics-time-location of the data
 #
@@ -119,7 +134,7 @@ class get_splitted_time:
 class PersonalDataTopicAnalysis:
     
     #initi function
-    def __init__(self,file_path,**keyword_parameters):
+    def __init__(self,file_path):
         #check correctness of the path
         try:
             self.file_path=file_path
@@ -283,7 +298,7 @@ class PersonalDataTopicAnalysis:
                 
                 i+=1
                 
-        #Main Part##
+        #MTime: ain Part##
         #filter according to month of the year specified
         t1=time()
         print('filtering time to {} {}...'.format(month,year))
@@ -300,7 +315,7 @@ class PersonalDataTopicAnalysis:
     #####
     
     
-    def retrieve_location(self,month,year):
+    def retrieve_location(self,month,year,tableTopic):
     
         def inner_loc(filtered_time):
             loc_time=pd.DataFrame()
@@ -374,17 +389,61 @@ class PersonalDataTopicAnalysis:
             return city_nations
         
         #
-        ###Main Part###
+        #Generate the most frequent location for that given topic
+        #
+        def retrive_topic_location(tableTopic,filtered_time):
+            
+            final_tt=filtered_time[['location','activity']]
+            final_tt=final_tt.reset_index()
+            
+            location_for_topic=[]
+            l=0
+            for l in range(0,self.n_comp):
+                t1=tableTopic.iloc[l]['words']
+                loc=[]
+                for w in t1:
+                    i=final_tt[final_tt['activity'].str.find(w)>-1].index
+                    t=list(i.values)
+  
+                    for tt in t:
+                        loc.append(final_tt['location'].iloc[tt])
+                    table=pd.DataFrame({
+                    'where':loc,
+                    'count':1
+                        })
+                table=table[table['where']!='-']
+                table=table.groupby('where').count()
+
+                table.sort_values(by=['count'],ascending=False,inplace=True)
+
+                tt=table.index[0]
+                tt=tt.split('=')[1]
+
+                latlong=tt
+                geolocator = Nominatim()
+                try:
+                    info=geolocator.reverse(latlong)
+                    location_for_topic.append(str(info))
+                except Exception as e:
+                    pass
+                
+            return location_for_topic
+        
+
+        
+        #
+        ###Location: Main Part###
         #
         print('filtering time to {} {}...'.format(month,year))
         filtered_time=self.filter_time(year,month,self.splitted_time) 
         print('generating locations...')
         t1=time()
         city_nations=inner_loc(filtered_time)
+        loc_topic=retrive_topic_location(tableTopic,filtered_time)
         t2=time()
         print('time elapsed for generating locations: {}'.format(t2-t1))
-        
-        return city_nations
+
+        return city_nations,loc_topic
         
      
     #
@@ -399,7 +458,7 @@ class PersonalDataTopicAnalysis:
         
         max_features=300
         n_top_word=20
-        n_comp=9
+        self.n_comp=8
         
         #
         #
@@ -510,7 +569,7 @@ class PersonalDataTopicAnalysis:
         #perform Non-negative-matrix-clustering
         #
         def get_nmf(tfidf_matrix,n_comp):
-            nmf=NMF(n_components=n_comp,random_state=1,max_iter=400, beta_loss='itakura-saito',solver='mu', l1_ratio=.5,init='nndsvda')
+            nmf=NMF(n_components=n_comp,random_state=1,max_iter=1000, beta_loss='frobenius',solver='mu', l1_ratio=.5,init='nndsvda')
             topic_nmf=nmf.fit_transform(tfidf_matrix)
             
             return nmf
@@ -537,13 +596,14 @@ class PersonalDataTopicAnalysis:
             wiki= MediaWiki()
             cat_dic={}
             cat_dic_freq={}
-            
+            cat_miss={}
             #for every cluster created
             for tt in range(0,t_range):
+                n_disamb=0
                 dic={}
-                #for every element in the cluster
+            #for every element in the cluster
                 for k in table.iloc[tt]:
-                    #print('###'+k)
+                #print('###'+k)
                     try:
                         l=wiki.page(k)
                         for w in l.links[:10]:
@@ -555,8 +615,13 @@ class PersonalDataTopicAnalysis:
                                             dic[ww]+=1
                                         else:
                                             dic[ww]=1
+                #for w in l.categories[:10]:
+                #    for k in dic:
+                #        if k in w:
+                #            dic[k]+=1
                     except DisambiguationError as e:
-                        #print('*** disamb')
+                        n_disamb+=1
+                    #print('*** disamb')
                         for w in e.options[:10]:
                             if '(' in w:
                                 if 'disambiguation' not in w:
@@ -568,18 +633,23 @@ class PersonalDataTopicAnalysis:
                                             dic[ww]=1
                                 
                     except PageError:
+                        n_disamb+=1
                         pass
                                                             
-          
-                cat_dic[tt]=list(OrderedDict(sorted(dic.items(),key=lambda x:x[1],reverse=True)[:3]))
+            #print(list(dic.items())[:3])
+            #return only the title of topic->no freq
+                cat_dic[tt]=list(OrderedDict(sorted(dic.items(),key=lambda x:x[1],reverse=True)[:2]))
                 cat_dic_freq[tt]=(list(OrderedDict(sorted(dic.items(),key=lambda x:x[1],reverse=True)).values())[:3],len(dic))
-        
+                cat_miss[tt]=n_disamb
             return cat_dic,cat_dic_freq
+                                                            
+          
+                
         
         
         
         #
-        ##############Main part########à#######
+        ##############Topic: Main part########à#######
         #
         
         
@@ -597,10 +667,10 @@ class PersonalDataTopicAnalysis:
         
             print('generating topic with NMF...')
             t1=time()
-            nmf=get_nmf(tfidf_matrix,n_comp)
+            nmf=get_nmf(tfidf_matrix,self.n_comp)
             tableTopic=table_topic(nmf,tfidf.get_feature_names(),20)
             t2=time()
-            print('time elapsed for topic generation: {}.format(t2-t1)')
+            print('time elapsed for topic generation: {}'.format(t2-t1))
             
         elif alg == 'LDA':
             print('generating tf factor...')
@@ -609,14 +679,14 @@ class PersonalDataTopicAnalysis:
         
             print('generating topic with LDA...')
             t1=time()
-            lda=get_lda(tf_matrix,n_comp)
+            lda=get_lda(tf_matrix,self.n_comp)
             tableTopic=table_topic(lda,tf.get_feature_names(),20)
             t2=time()
-            print('time elapsed for topic generation: {}.format(t2-t1)')
+            print('time elapsed for topic generation: {}'.format(t2-t1))
             
         print('generating labels for topics...')
         t1=time()
-        topic_candidates,f=get_candidate(tableTopic['words'],n_comp)
+        topic_candidates,f=get_candidate(tableTopic['words'],self.n_comp)
         t2=time()
         print(' time elapsed for labeling generation: {}'.format(t2-t1))
         
@@ -626,14 +696,23 @@ class PersonalDataTopicAnalysis:
         return tableTopic
     
     def info_table(self,month,year):
-        city_nations=self.retrieve_location(month,year)
         tableTopic=self.generate_topic(month,year,'NMF')
         
-        loc=list(OrderedDict(sorted(city_nations.items(),key=lambda x:x[1],reverse=True)))[0]
-        tableTopic['location']=loc
+        city_nations,location_for_topic=self.retrieve_location(month,year,tableTopic)
+        l_=[]
+        print(location_for_topic)
+        for l in location_for_topic:
+            t=l.split(',')
+            if re.match('^[0-9]*[/ \w]*',t[0]):
+                ll=t[1]+':'+t[4]+':'+t[-1]
+            else:
+                ll=t[0]+':'+t[4]+':'+t[-1]
+                
+            l_.append(ll)
+        tableTopic['location']=l_
         return tableTopic
-        
             
+           
     #
     #exe function
     def execute(self):
