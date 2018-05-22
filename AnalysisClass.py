@@ -122,7 +122,7 @@ class get_splitted_time:
             return tempFrame
 
 
-# In[183]:
+# In[187]:
 
 
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
@@ -291,7 +291,7 @@ class PersonalDataTopicAnalysis:
     #####
     
     
-    def retrieve_location(self,tableTopic):
+    def retrieve_location(self,year,month,yetableTopic):
     
         def inner_loc(filtered_time):
             loc_time=pd.DataFrame()
@@ -833,7 +833,7 @@ class PersonalDataTopicAnalysis:
         
         print('generation locations for topic...')
         t1=time()
-        city_nations,location_for_topic=self.retrieve_location(tableTopic)
+        city_nations,location_for_topic=self.retrieve_location(year,month,tableTopic)
         
         l_=[]
         #print(location_for_topic)
