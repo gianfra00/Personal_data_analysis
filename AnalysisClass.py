@@ -122,7 +122,7 @@ class get_splitted_time:
             return tempFrame
 
 
-# In[62]:
+# In[1]:
 
 
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
@@ -832,9 +832,9 @@ class PersonalDataTopicAnalysis:
     def info_table(self,month,year,type_alg):
         #group visited pages by over same url
         #check if month and year are present:
-        if prova.searchedF[(prova.searchedF['month']==month) & (prova.searchedF['year']==year)].empty:
+        if self.searchedF[(self.searchedF['month']==month) & (self.searchedF['year']==year)].empty:
             print('combination of month and year not present: please try another month')
-            return -1
+            return None
         tableTopic=self.generate_topic(month,year,type_alg)
         
         print('generation locations for topic...')
