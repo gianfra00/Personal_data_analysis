@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[136]:
+# In[1]:
 
 
 #All libraries and dependences
@@ -38,7 +38,7 @@ from collections import OrderedDict
 from geopy.geocoders import Nominatim
 
 
-# In[137]:
+# In[2]:
 
 
 #
@@ -122,7 +122,7 @@ class get_splitted_time:
             return tempFrame
 
 
-# In[187]:
+# In[62]:
 
 
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
@@ -291,7 +291,7 @@ class PersonalDataTopicAnalysis:
     #####
     
     
-    def retrieve_location(self,year,month,yetableTopic):
+    def retrieve_location(self,year,month,tableTopic):
     
         def inner_loc(filtered_time):
             loc_time=pd.DataFrame()
@@ -769,18 +769,18 @@ class PersonalDataTopicAnalysis:
         
         print('filtering time to {} {}...'.format(month,year))
         
-        self.searchedF=self.filter_time(year,month,self.searchedF) 
-        self.visitedF=self.filter_time(year,month,self.visitedF) 
+        searchedF_=self.filter_time(year,month,self.searchedF) 
+        visitedF_=self.filter_time(year,month,self.visitedF) 
         
         print('preprocessing corpus...')
         
         #searched entries preporeccing
-        f_corpusdata_searched=clean_words_table(self.searchedF['activity'])
+        f_corpusdata_searched=clean_words_table(searchedF_['activity'])
         gg=f_corpusdata_searched.groupby('activity').count().reset_index()
         final_searched=list(gg[gg['activity']!='']['activity'])
 
         #visited entry preprocessing
-        grouped_url=self.visitedF.groupby('activity').count()
+        grouped_url=visitedF_.groupby('activity').count()
         titles=retrieveUrlTitles(grouped_url)
 
         f_corpusdata_visited=pre_process_url(titles)
@@ -828,7 +828,13 @@ class PersonalDataTopicAnalysis:
         self.failure=calculate_failure_rate(failure_val,max_features)
         return tableTopic
     
+    
     def info_table(self,month,year,type_alg):
+        #group visited pages by over same url
+        #check if month and year are present:
+        if prova.searchedF[(prova.searchedF['month']==month) & (prova.searchedF['year']==year)].empty:
+            print('combination of month and year not present: please try another month')
+            return -1
         tableTopic=self.generate_topic(month,year,type_alg)
         
         print('generation locations for topic...')
@@ -857,6 +863,6 @@ class PersonalDataTopicAnalysis:
         self.parse_time_frame()
         self.split_entry()
         
-        #group visited pages by over same url
         self.groupped_visited_url=self.visitedF.groupby('activity').count()
+        
 
