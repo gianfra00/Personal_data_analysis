@@ -20,8 +20,8 @@ import re
 import datetime
 import collections
 from time import time
-import pyLDAvis
-import pyLDAvis.sklearn 
+#import pyLDAvis
+#import pyLDAvis.sklearn 
 import nltk
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.collocations import *
