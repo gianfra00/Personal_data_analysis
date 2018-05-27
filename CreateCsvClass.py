@@ -1,6 +1,8 @@
 
 # coding: utf-8
 
+# In[1]:
+
 
 #all libraries needed
 
@@ -11,6 +13,10 @@ import codecs
 import os 
 import re
 from time import time
+
+
+# In[3]:
+
 
 #
 #Class that taking the directory path of your google data set, will generate the cvs from My Activity directory, which contains
@@ -52,8 +58,8 @@ class gCsvConverter():
         inner_path=self.readingPath+'/'+path
         html=[el for el in os.listdir(inner_path) if re.match('^.*\.html',el)][0]
                 
-        r_html=inner_path+'/'+html
         if len(html)>1: 
+            r_html=inner_path+'/'+html
             f = codecs.open(r_html, 'r', 'utf-8')
             document= BeautifulSoup(f.read(),'html5lib')
 
@@ -115,6 +121,20 @@ class gCsvConverter():
         t2=time()
         print('time elapsed generating csv tables {}'.format(t2-t1))
             
+                
+        
+                  
+
+
+# In[4]:
+
+
+g=gCsvConverter('/home/janz/keras/datas/json_google','/home/janz/keras/datas/csv/chrome')
+g.execute()
+
+
+# In[1]:
+
 
 #class for generating csv from facebook
 
@@ -232,55 +252,67 @@ class fCsvConverter:
             return UFrame.T
 
         #take the directory path that contains all the html file->messages
-        def parseMessages(path):
-            f_path=self.readingPath+'/'+path
-            initial_list=  os.listdir(f_path)
-            el = [w for w in initial_list if re.match('^.*\.(html|htm)',w)]
- 
-            mFrame=pd.DataFrame(columns=['c_id','title','partic','time','user','message'])
-            i=0
-            for l in el[:20]:
-                iD=l.split('.')[0]
+        #take the directory path that contains all the html file->messages
+        def parseMessagges(path,finalPath):
+            el=  os.listdir(path)
+            el = [w for w in el if re.match('^.*\.(html|htm)',w)]
 
-                ms1 = f_path+'/'+l
-             
+            mFrame=pd.DataFrame(columns=['c_id','title','partic','time','user','message'])
+            
+            ix=0
+            iD = ms1 = f = document = None
+            for l in el:
+                iD=l.split('.')[0]
+                #print(iD)
+                ms1 = path+'/'+l
                 f = codecs.open(ms1, 'r', 'utf-8')
                 document= BeautifulSoup(f.read(),'html5lib')
+        
+                thread = title = participants = None
+        
                 try:
                     thread=document.body.find('div', attrs={'class':'thread'})
                     title=thread.h3.text
                     participants=thread.h3.next_sibling
                     ms_el=thread.findAll('div',attrs={'class':'message'})
-
-                    contents=thread.findAll('p')
-                    previous = next_ = None
-                    l = len(contents)
-                    for index, p in enumerate(contents):
-                        if p.img!=None:
-                            if index > 0:
-                                previous = contents[index - 1]
-                            if index < (l - 1):
-                                next_ = contents[index + 1]
-                            
-                            contents.remove(previous)
-                            contents.remove(next_)
-                    
-                    contents=[c.text for c in contents]
+            
+                    i=0
+                    final_list=[]
+            
+                    for index in range(0,len(ms_el)):
+                        i=thread.index(ms_el[index])
+    
+                        e=list(thread)[i+1].text
+                        if e!='':
+                            final_list.append(ms_el[index])
+                            final_list.append(e)
+                        elif i+2<len(list(thread)):
+                            #check the next one
+                            e=list(thread)[i+2]
+                            if e.name=='p':
+                                final_list.append(ms_el[index])
+                                final_list.append(e.text)
                         
-                    l=0
-                    for s in ms_el:
-                        header=s.find('div',attrs={'class':'message_header'})
-                        users=header.find('span',attrs={'class':'user'}).text
-                        times=header.find('span',attrs={'class':'meta'}).text
-
-                        mFrame.loc[i]=[iD,title,participants,times,users,contents[l]]
-                        i+=1
-                        l+=1
+                    for index,s in enumerate(final_list):
+                        if type(s) is not str:
+                            #tag with info:
+                            header=s.find('div',attrs={'class':'message_header'})
+                            users=header.find('span',attrs={'class':'user'}).text
+                            times=header.find('span',attrs={'class':'meta'}).text
+                            mFrame.loc[ix]=[iD,title,participants,times,users,final_list[index+1]]
+                        ix+=1
                 
+                    final_list.clear()
+                    ms_el.clear()
+    
                 except AttributeError as e:
                     pass
 
+            name='/messages.csv'
             return mFrame
+            #mFrame.to_csv(finalPath+name,sep='\t')
+
+
         
         
         #main section
@@ -325,3 +357,4 @@ class fCsvConverter:
         #todo
         #self.parseMessages(self.mDir)
                 
+

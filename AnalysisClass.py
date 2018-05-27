@@ -122,7 +122,7 @@ class get_splitted_time:
             return tempFrame
 
 
-# In[1]:
+# In[8]:
 
 
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
@@ -662,6 +662,14 @@ class PersonalDataTopicAnalysis:
         #
         
         def get_candidate(table,t_range):
+            
+            
+            def update_dic(dic,w):
+                if w in dic:
+                    dic[w]+=1
+                else:
+                    dic[w]=1
+                    
             wiki= MediaWiki()
             cat_dic={}
             cat_dic_freq={}
@@ -679,15 +687,20 @@ class PersonalDataTopicAnalysis:
                         l=wiki.page(k)
                         for w in l.links[:10]:
                             if '(' in w:
-                                if 'disambiguation' not in w:
-                                    ww=w.split('(')[1][:-1] 
-                                    if len(ww)>3 and len(ww.split(' '))<3:
-                                        if 'song' in ww or 'film' or 'automibile' in ww:
+                                ww=w[w.find('(')+1:w.find(')')]
+                                if len(ww)>5 and 'disambiguation' not in ww: 
+                                    if len(ww.split(' '))<3:
+                                        if 'song' in ww or 'film' in ww or 'automobile' in ww:
                                             ww=ww.split(' ')[-1]
                                         if ww in dic:
                                             dic[ww]+=1
                                         else:
                                             dic[ww]=1
+                        for w in l.categories[:10]:
+                            if len(w)>4:
+                                for ww in w.split(' '):
+                                    if ww in dic:
+                                        dic[ww]+=1
                 #for w in l.categories[:10]:
                 #    for k in dic:
                 #        if k in w:
@@ -697,10 +710,10 @@ class PersonalDataTopicAnalysis:
                     #print('*** disamb')
                         for w in e.options[:10]:
                             if '(' in w:
-                                if 'disambiguation' not in w:
-                                    ww=w.split('(')[1][:-1] 
-                                    if len(ww)>4 and len(ww.split(' '))<3:
-                                        if 'song' in ww or 'film' or 'automibile' in ww:
+                                ww=w[w.find('(')+1:w.find(')')]
+                                if len(ww)>5 and 'disambiguation' not in ww: 
+                                    if len(ww.split(' '))<3:
+                                        if 'song' in ww or 'film' in ww or 'automobile' in ww:
                                             ww=ww.split(' ')[-1]
                                         if ww in dic:
                                             dic[ww]+=1
@@ -854,6 +867,8 @@ class PersonalDataTopicAnalysis:
         tableTopic['location']=l_
         t2=time()
         print('time ellapsed for generatin locations :{}'.format(t2-t1))
+        tableTopic['words']=tableTopic['words'].apply(lambda x:','.join(x))
+        tableTopic['labels']=tableTopic['labels'].apply(lambda x:','.join(x))
         return tableTopic
             
            
