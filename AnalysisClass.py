@@ -20,18 +20,15 @@ import re
 import datetime
 import collections
 from time import time
-#import pyLDAvis
-#import pyLDAvis.sklearn 
 import nltk
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.collocations import *
 import string
 nltk.download('stopwords')
-nltk.download('wordnet')
+#nltk.download('wordnet')
 from nltk.corpus import stopwords
 from nltk.corpus import wordnet
 from time import time
-#from sklearn.neighbors import KNeighborsClassifier
 from mediawiki import MediaWiki
 from mediawiki import DisambiguationError,PageError
 from collections import OrderedDict
@@ -119,10 +116,11 @@ class get_splitted_time:
                 'time':self.times
             })      
             tempFrame['day_name']=tempFrame.apply(lambda row:self.get_day(int(row['year']),self.calendar[row['month']],int(row['day'])),axis=1)
+            self.punctuation = set(string.punctuation)
             return tempFrame
 
 
-# In[8]:
+# In[34]:
 
 
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
@@ -665,16 +663,76 @@ class PersonalDataTopicAnalysis:
             
             
             def update_dic(dic,w):
-                if w in dic:
-                    dic[w]+=1
+                inc=0
+                if len(w.split(' '))>1:
+                    inc=1.5
                 else:
-                    dic[w]=1
+                    inc=1
+                if w in dic:
+                    dic[w]+=inc
+                else:
+                    dic[w]=inc
+            
+                return
+            
+            def operate_on_label(dic_to_operate,w):
+                punctuation = set(string.punctuation)
+                if '(' in w:
+                    ww=w[w.find('(')+1:w.find(')')]
+                    if len(ww)>5 and 'disambiguation' not in ww: 
+                        list_w=ww.split(' ')
+                        if len(list_w)<3:
+                            if len(list_w)>1:
+                                if 'song' in list_w:
+                                    update_dic(dic,'song')
+                                else:
+                                    w_el=[k for k in list_w if not k.isdigit()]
+                                    w_el.append(' '.join(w_el))
+                                    for ww in w_el:
+                                        ww = "".join([i.lower() for i in ww if i not in punctuation])
+                                        update_dic(dic,ww)
+                            else:
+                                ww=ww = "".join([i.lower() for i in list_w if i not in punctuation])
+                                update_dic(dic,ww)
+                                
+                        list_w.clear()
+
+                return
+            
+            def control_final_labels(dic):
+
+                ff={}
+                final_labels={}
+                for i in range(0,self.n_comp):
+                    tt=list(dic[i].keys())
+
+                    f=tt[0]
+                    s=tt[1]
+    
+                #if the combination of the two most candidate label is present in the list->take the combination
+                    if f+' '+s in tt:
+                        f=f+' '+s
+                        s=tt[2]
+    
+                #if one candidate label is cointained in another
+                    if s.find(f)>-1:
+                        f=tt[2]
+    
+                    elif f.find(s)>-1:
+                        s=tt[2]
+    
+                    final_labels[i]=[f,s]
+                    ff[i]=([dic[i][f],dic[i][s]],len(dic[i]))
+        
+                return final_labels,ff
+
                     
             wiki= MediaWiki()
             cat_dic={}
             cat_dic_freq={}
             cat_dissamb={}
             cat_not_found={}
+            punctuation=set(string.punctuation)
             #for every cluster created
             for tt in range(0,t_range):
                 n_disamb=0
@@ -686,51 +744,35 @@ class PersonalDataTopicAnalysis:
                     try:
                         l=wiki.page(k)
                         for w in l.links[:10]:
-                            if '(' in w:
-                                ww=w[w.find('(')+1:w.find(')')]
-                                if len(ww)>5 and 'disambiguation' not in ww: 
-                                    if len(ww.split(' '))<3:
-                                        if 'song' in ww or 'film' in ww or 'automobile' in ww:
-                                            ww=ww.split(' ')[-1]
-                                        if ww in dic:
-                                            dic[ww]+=1
-                                        else:
-                                            dic[ww]=1
+                            operate_on_label(dic,w)
                         for w in l.categories[:10]:
                             if len(w)>4:
                                 for ww in w.split(' '):
+                                    ww = "".join([i.lower() for i in ww if i not in punctuation])
                                     if ww in dic:
                                         dic[ww]+=1
-                #for w in l.categories[:10]:
-                #    for k in dic:
-                #        if k in w:
-                #            dic[k]+=1
+                            
                     except DisambiguationError as e:
                         n_disamb+=1
                     #print('*** disamb')
                         for w in e.options[:10]:
-                            if '(' in w:
-                                ww=w[w.find('(')+1:w.find(')')]
-                                if len(ww)>5 and 'disambiguation' not in ww: 
-                                    if len(ww.split(' '))<3:
-                                        if 'song' in ww or 'film' in ww or 'automobile' in ww:
-                                            ww=ww.split(' ')[-1]
-                                        if ww in dic:
-                                            dic[ww]+=1
-                                        else:
-                                            dic[ww]=1
+                            operate_on_label(dic,w)
                                 
                     except PageError:
                         n_miss+=1
                                                             
             #print(list(dic.items())[:3])
             #return only the title of topic->no freq
-                cat_dic[tt]=list(OrderedDict(sorted(dic.items(),key=lambda x:x[1],reverse=True)[:2]))
+                cat_dic[tt]=OrderedDict(sorted(dic.items(),key=lambda x:x[1],reverse=True))
+                print(cat_dic[tt])
                 cat_dic_freq[tt]=(list(OrderedDict(sorted(dic.items(),key=lambda x:x[1],reverse=True)).values())[:2],len(dic))
                 cat_dissamb[tt]=n_disamb
                 cat_not_found[tt]=n_miss
         
-            return cat_dic,cat_dic_freq,[cat_dissamb,cat_not_found]
+            final_labels={}
+            final_labels,cat_dic_freq=control_final_labels(cat_dic)
+            
+            return final_labels,cat_dic_freq,[cat_dissamb,cat_not_found]
         
         #
         #
