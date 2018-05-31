@@ -120,7 +120,7 @@ class get_splitted_time:
             return tempFrame
 
 
-# In[34]:
+# In[40]:
 
 
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
@@ -139,6 +139,7 @@ class PersonalDataTopicAnalysis:
         try:
             self.file_path=file_path
             self.dFrame=pd.read_csv(self.file_path,delimiter='\t')
+            print('data frame succesfuly created...')
         except Exception as e:
             print('-path error try another path-')
             
@@ -659,7 +660,7 @@ class PersonalDataTopicAnalysis:
         #
         #
         
-        def get_candidate(table,t_range):
+        def get_candidate(table):
             
             
             def update_dic(dic,w):
@@ -667,19 +668,21 @@ class PersonalDataTopicAnalysis:
                 if len(w.split(' '))>1:
                     inc=1.5
                 else:
-                    inc=1
-                if w in dic:
-                    dic[w]+=inc
-                else:
-                    dic[w]=inc
+                    inc=1.0
+                    
+                if len(w)>3 and not re.match(r'^[0-9]+[\w \s]*',w):
+                    if w in dic:
+                        dic[w]+=inc
+                    else:
+                        dic[w]=inc
             
                 return
             
             def operate_on_label(dic_to_operate,w):
                 punctuation = set(string.punctuation)
-                if '(' in w:
+                if '(' in w and w.endswith(')') and len(w.split(' '))<4:
                     ww=w[w.find('(')+1:w.find(')')]
-                    if len(ww)>5 and 'disambiguation' not in ww: 
+                    if len(ww)>3 and 'disambiguation' not in ww and not re.match(r'^[0-9]+[\w \s]*',ww): 
                         list_w=ww.split(' ')
                         if len(list_w)<3:
                             if len(list_w)>1:
@@ -709,23 +712,35 @@ class PersonalDataTopicAnalysis:
                     f=tt[0]
                     s=tt[1]
     
-                #if the combination of the two most candidate label is present in the list->take the combination
+                    #if the combination of the two most candidate label is present in the list->take the combination
                     if f+' '+s in tt:
                         f=f+' '+s
+                        #take the next most candidate label
+                        tt.remove(f)
                         s=tt[2]
     
-                #if one candidate label is cointained in another
+                    #if one candidate label is cointained in another
+                    #if the first one is contained in the second one
                     if s.find(f)>-1:
-                        f=tt[2]
-    
+                        tt.remove(f)
+                        f=s
+                        s=tt[1]
+                
+                    #if the second one is contained in the first secoon 
                     elif f.find(s)>-1:
-                        s=tt[2]
-    
+                        tt.remove(s)
+                        s=tt[1]
+                
                     final_labels[i]=[f,s]
+                    #print(dic[i][tt[2]])
+                    #print(dic[i][s])
+                    if dic[i][tt[2]]==dic[i][s]:
+                        if tt[2] not in f and tt[2] not in s and s not in tt[2] and f not in tt[2]:
+                            final_labels[i].append(tt[2])
+        
                     ff[i]=([dic[i][f],dic[i][s]],len(dic[i]))
         
                 return final_labels,ff
-
                     
             wiki= MediaWiki()
             cat_dic={}
@@ -734,7 +749,7 @@ class PersonalDataTopicAnalysis:
             cat_not_found={}
             punctuation=set(string.punctuation)
             #for every cluster created
-            for tt in range(0,t_range):
+            for tt in range(0,self.n_comp):
                 n_disamb=0
                 n_miss=0
                 dic={}
@@ -743,19 +758,15 @@ class PersonalDataTopicAnalysis:
                 #print('###'+k)
                     try:
                         l=wiki.page(k)
-                        for w in l.links[:10]:
+                        for w in l.links[:13]:
                             operate_on_label(dic,w)
-                        for w in l.categories[:10]:
-                            if len(w)>4:
-                                for ww in w.split(' '):
-                                    ww = "".join([i.lower() for i in ww if i not in punctuation])
-                                    if ww in dic:
-                                        dic[ww]+=1
+                        for w in l.categories[:12]:
+                            operate_on_label(dic,w)
                             
                     except DisambiguationError as e:
                         n_disamb+=1
                     #print('*** disamb')
-                        for w in e.options[:10]:
+                        for w in e.options[:12]:
                             operate_on_label(dic,w)
                                 
                     except PageError:
@@ -765,7 +776,7 @@ class PersonalDataTopicAnalysis:
             #return only the title of topic->no freq
                 cat_dic[tt]=OrderedDict(sorted(dic.items(),key=lambda x:x[1],reverse=True))
                 print(cat_dic[tt])
-                cat_dic_freq[tt]=(list(OrderedDict(sorted(dic.items(),key=lambda x:x[1],reverse=True)).values())[:2],len(dic))
+                #cat_dic_freq[tt]=(list(OrderedDict(sorted(dic.items(),key=lambda x:x[1],reverse=True)).values())[:2],len(dic))
                 cat_dissamb[tt]=n_disamb
                 cat_not_found[tt]=n_miss
         
@@ -841,8 +852,10 @@ class PersonalDataTopicAnalysis:
         f_corpusdata_visited=pre_process_url(titles)
         title_cleaned=clean_words(f_corpusdata_visited['titles'])
 
+        final_entries=[]
         final_entries=final_searched.copy()
-        final_entries.extend(title_cleaned)      
+        final_entries.extend(title_cleaned) 
+        
         ##
         
         if alg == 'NMF' or alg == 'nmf':
@@ -853,7 +866,7 @@ class PersonalDataTopicAnalysis:
             print('generating topic with NMF...')
             t1=time()
             nmf=get_nmf(tfidf_matrix,self.n_comp)
-            tableTopic=table_topic(nmf,tfidf.get_feature_names(),20)
+            tableTopic=table_topic(nmf,tfidf.get_feature_names(),n_top_word)
             t2=time()
             print('time elapsed for topic generation: {}'.format(t2-t1))
             
@@ -865,13 +878,13 @@ class PersonalDataTopicAnalysis:
             print('generating topic with LDA...')
             t1=time()
             lda=get_lda(tf_matrix,self.n_comp)
-            tableTopic=table_topic(lda,tf.get_feature_names(),20)
+            tableTopic=table_topic(lda,tf.get_feature_names(),n_top_word)
             t2=time()
             print('time elapsed for topic generation: {}'.format(t2-t1))
             
         print('generating labels for topics...')
         t1=time()
-        topic_candidates,f,failure_val=get_candidate(tableTopic['words'],self.n_comp)
+        topic_candidates,f,failure_val=get_candidate(tableTopic['words'])
         t2=time()
         print(' time elapsed for labeling generation: {}'.format(t2-t1))
         
@@ -917,9 +930,12 @@ class PersonalDataTopicAnalysis:
     #
     #exe function
     def execute(self):
-        self.parse_time_frame()
-        self.split_entry()
+        try:
+            self.parse_time_frame()
+            self.split_entry()
         
-        self.groupped_visited_url=self.visitedF.groupby('activity').count()
+            self.groupped_visited_url=self.visitedF.groupby('activity').count()
+        except AttributeError:
+            print('dFrame not created, path not valid')
         
 
