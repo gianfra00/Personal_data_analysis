@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 #All libraries and dependences
@@ -35,7 +35,7 @@ from collections import OrderedDict
 from geopy.geocoders import Nominatim
 
 
-# In[2]:
+# In[3]:
 
 
 #
@@ -120,7 +120,7 @@ class get_splitted_time:
             return tempFrame
 
 
-# In[40]:
+# In[29]:
 
 
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
@@ -140,6 +140,7 @@ class PersonalDataTopicAnalysis:
             self.file_path=file_path
             self.dFrame=pd.read_csv(self.file_path,delimiter='\t')
             print('data frame succesfuly created...')
+            self.timeParser=get_splitted_time()
         except Exception as e:
             print('-path error try another path-')
             
@@ -152,9 +153,8 @@ class PersonalDataTopicAnalysis:
     #function used for parsening the time stamp: for future time filtering   
     def parse_time_frame(self):
         t1=time()
-        timeParser=get_splitted_time()
         
-        self.splitted_time=timeParser.execute(self.dFrame)
+        self.splitted_time=self.timeParser.execute(self.dFrame)
         self.splitted_time['activity']=self.dFrame['activity']
         self.splitted_time['name_activity']=self.dFrame['name_activity']
         self.splitted_time['typeSearch']=self.dFrame['typeSearch']
@@ -167,12 +167,25 @@ class PersonalDataTopicAnalysis:
     #
     #dividing the frame into two frames: pages visited -pages searched
     def split_entry(self):
-        self.searchedF=self.splitted_time[self.splitted_time['typeSearch']=='Searched for'].reset_index()
-        self.visitedF=self.splitted_time[self.splitted_time['typeSearch']=='Visited'].reset_index()
+        if 'Visited' in list(self.splitted_time['typeSearch']):
+            self.type_table='search'
+            self.searchedF=self.splitted_time[self.splitted_time['typeSearch']=='Searched for'].reset_index()
+            self.visitedF=self.splitted_time[self.splitted_time['typeSearch']=='Visited'].reset_index()
+        elif 'Watched' in list(self.splitted_time['typeSearch']):
+            self.type_table='youtube'
+            self.searchedF=self.splitted_time[self.splitted_time['typeSearch']=='Searched for'].reset_index()
+            self.visitedF=self.splitted_time[self.splitted_time['typeSearch']=='Watched'].reset_index()
         
+        elif 'Viewed image from' in list(self.splitted_time['typeSearch']):
+            self.type_table='image'
+            self.searchedF=self.splitted_time[self.splitted_time['typeSearch']=='Searched for'].reset_index()
+            self.visitedF=self.splitted_time[self.splitted_time['typeSearch']=='Viewed image from'].reset_index()
+            
         self.searchedF=self.searchedF.drop(['activity','typeSearch'],axis=1)
         self.visitedF=self.visitedF.drop(['typeSearch','location','name_activity'],axis=1)
         self.searchedF.rename(columns={'name_activity':'activity'},inplace=True)
+            
+            
     #
     #
     #filtering the frame acording to the time specified by the user: year-month
@@ -472,16 +485,24 @@ class PersonalDataTopicAnalysis:
     #function used for retreiving titile information (outer function)
         def retrieveUrlTitles(visitedT):
             titles=[]
+            totN=0
             print('retreiving visited pages titles...')
+            print('n visited pages {}'.format(len(visitedT)))
+            if len(visitedT)>150:
+                print('Exeeding number of visited pages, trimming them...')
+                totN=150
+            else:
+                totN=len(visitedT)
+            
             init_time=time()
+            
             #print('n url {}'.format(len(visitedT.index)))
-            for url in list(visitedT.index):
+            for url in list(visitedT.index)[:totN]:
                 title= get_title(str(url))
                 if title != None:
                     titles.append(title)
             f_time=time()
             print('retriving titles elappsed time: {}'.format(f_time-init_time))
-            print('n titles {}'.format(len(titles)))
             return titles
         
         #
@@ -844,6 +865,7 @@ class PersonalDataTopicAnalysis:
         f_corpusdata_searched=clean_words_table(searchedF_['activity'])
         gg=f_corpusdata_searched.groupby('activity').count().reset_index()
         final_searched=list(gg[gg['activity']!='']['activity'])
+        print('final processed visited entries: {}'.format(len(final_searched)))
 
         #visited entry preprocessing
         grouped_url=visitedF_.groupby('activity').count()
@@ -861,11 +883,13 @@ class PersonalDataTopicAnalysis:
         if alg == 'NMF' or alg == 'nmf':
             print('generating tfidf factor...')
             tfidf_matrix,tfidf=get_tfidf(final_entries,(1,2),max_features)
+            tfidf_table1=None
             tfidf_table1=get_table(tfidf_matrix,tfidf.get_feature_names())
         
             print('generating topic with NMF...')
             t1=time()
             nmf=get_nmf(tfidf_matrix,self.n_comp)
+            tableTopic = None
             tableTopic=table_topic(nmf,tfidf.get_feature_names(),n_top_word)
             t2=time()
             print('time elapsed for topic generation: {}'.format(t2-t1))
@@ -873,17 +897,20 @@ class PersonalDataTopicAnalysis:
         elif alg == 'LDA' or alg == 'lda':
             print('generating tf factor...')
             tf_matrix,tf=get_tf(final_entries,(2,2),max_features)
+            tf_table1=None
             tf_table1=get_table(tf_matrix,tf.get_feature_names())
         
             print('generating topic with LDA...')
             t1=time()
             lda=get_lda(tf_matrix,self.n_comp)
+            tableTopic = None
             tableTopic=table_topic(lda,tf.get_feature_names(),n_top_word)
             t2=time()
             print('time elapsed for topic generation: {}'.format(t2-t1))
             
         print('generating labels for topics...')
         t1=time()
+        topic_candidates = f = failure_val = None
         topic_candidates,f,failure_val=get_candidate(tableTopic['words'])
         t2=time()
         print(' time elapsed for labeling generation: {}'.format(t2-t1))
@@ -905,23 +932,27 @@ class PersonalDataTopicAnalysis:
             return None
         tableTopic=self.generate_topic(month,year,type_alg)
         
-        print('generation locations for topic...')
-        t1=time()
-        city_nations,location_for_topic=self.retrieve_location(year,month,tableTopic)
+        if self.type_table=='search':
+            print('generation locations for topic...')
+            t1=time()
+            city_nations,location_for_topic=self.retrieve_location(year,month,tableTopic)
         
-        l_=[]
-        #print(location_for_topic)
-        for l in location_for_topic:
-            t=l.split(',')
-            if re.match(r'^[0-9]*[/ \w]*',t[0]):
-                ll=t[1]+':'+t[4]+':'+t[-1]
-            else:
-                ll=t[0]+':'+t[4]+':'+t[-1]
+            l_=[]
+            #print(location_for_topic)
+            for l in location_for_topic:
+                t=l.split(',')
+                if re.match(r'^[0-9]*[/ \w]*',t[0]):
+                    ll=t[1]+':'+t[4]+':'+t[-1]
+                else:
+                    ll=t[0]+':'+t[4]+':'+t[-1]
                 
-            l_.append(ll)
-        tableTopic['location']=l_
-        t2=time()
-        print('time ellapsed for generatin locations :{}'.format(t2-t1))
+                l_.append(ll)
+            tableTopic['location']=l_
+            t2=time()
+            print('time ellapsed for generatin locations :{}'.format(t2-t1))
+        else:
+            print('the following table does not support location generation')
+      
         tableTopic['words']=tableTopic['words'].apply(lambda x:','.join(x))
         tableTopic['labels']=tableTopic['labels'].apply(lambda x:','.join(x))
         return tableTopic
@@ -933,9 +964,10 @@ class PersonalDataTopicAnalysis:
         try:
             self.parse_time_frame()
             self.split_entry()
+            print('resource data type: {}'.format(self.type_table))
         
             self.groupped_visited_url=self.visitedF.groupby('activity').count()
         except AttributeError:
-            print('dFrame not created, path not valid')
+            print('error parsing data frame')
         
 
