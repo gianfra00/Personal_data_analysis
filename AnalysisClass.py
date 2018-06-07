@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 #All libraries and dependences
@@ -35,7 +35,7 @@ from collections import OrderedDict
 from geopy.geocoders import Nominatim
 
 
-# In[3]:
+# In[2]:
 
 
 #
@@ -120,7 +120,7 @@ class get_splitted_time:
             return tempFrame
 
 
-# In[29]:
+# In[ ]:
 
 
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
