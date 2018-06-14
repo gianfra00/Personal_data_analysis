@@ -984,22 +984,3 @@ class PersonalDataTopicAnalysis:
             print('error parsing data frame')
         
 
-
-# In[16]:
-
-
-prova=PersonalDataTopicAnalysis('/home/janz/keras/datas/csv/chrome/Search.csv')
-prova.execute()
-
-
-# In[17]:
-
-
-tt=prova.info_table('Dec','2017','nmf')
-
-
-# In[18]:
-
-
-tt
-
