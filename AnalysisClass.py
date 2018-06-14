@@ -120,7 +120,7 @@ class get_splitted_time:
             return tempFrame
 
 
-# In[ ]:
+# In[15]:
 
 
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
@@ -358,21 +358,26 @@ class PersonalDataTopicAnalysis:
         
             labels=nations.keys()
             sizes=nations.values()
-
+            
             labels2=city_nations.keys()
             sizes2=city_nations.values()
 
             fig=pt.figure(figsize=(7,3), dpi=110)
             ax2=pt.subplot2grid((1,2),(0,0))
             ax2.set_title('nations')
-
-            pt.pie(sizes,labels=labels)
+            pt.pie(sizes, shadow=True, startangle=90)
+            pt.legend(labels,loc='lower right')
+            pt.axis('equal')
+            pt.tight_layout()
             ax3=pt.subplot2grid((1,2),(0,1))
             ax3.set_title('city_nation')
-            pt.pie(sizes2,labels=labels2)
+            pt.pie(sizes2, shadow=True, startangle=90)
+            pt.legend(labels2,loc='lower right')
+            pt.axis('equal')
+            #pt.tight_layout(pad=1, w_pad=10.0)
+            pt.tight_layout()
 
-            pt.tight_layout(pad=1, w_pad=10.0)
-            #pt.show()
+            pt.show()
             
             return city_nations
         
@@ -730,36 +735,43 @@ class PersonalDataTopicAnalysis:
                 for i in range(0,self.n_comp):
                     tt=list(dic[i].keys())
 
-                    f=tt[0]
-                    s=tt[1]
+                    l=len(dic[i])
+                    index_f=0
+                    index_s=1
+
+                    #most rated label
+                    f=tt[index_f]
+                    #second most rated label
+                    s=tt[index_s]
     
                     #if the combination of the two most candidate label is present in the list->take the combination
                     if f+' '+s in tt:
                         f=f+' '+s
-                        #take the next most candidate label
                         tt.remove(f)
-                        s=tt[2]
+                        l=l-1
+                        #take the next most candidate label
+                        index_s+=1
+                        s=tt[index_s]
     
                     #if one candidate label is cointained in another
                     #if the first one is contained in the second one
                     if s.find(f)>-1:
+                        l=l-1
                         tt.remove(f)
                         f=s
-                        s=tt[1]
+                        index_s+=1
+                        s=tt[index_s]
                 
                     #if the second one is contained in the first secoon 
                     elif f.find(s)>-1:
                         tt.remove(s)
-                        s=tt[1]
+                        l=l-1
+                        index_s+=1
+                        s=tt[index_s]
                 
                     final_labels[i]=[f,s]
-                    #print(dic[i][tt[2]])
-                    #print(dic[i][s])
-                    if dic[i][tt[2]]==dic[i][s]:
-                        if tt[2] not in f and tt[2] not in s and s not in tt[2] and f not in tt[2]:
-                            final_labels[i].append(tt[2])
-        
-                    ff[i]=([dic[i][f],dic[i][s]],len(dic[i]))
+                    #take the freq of the top candidates, plus the total number of candidates
+                    ff[i]=([dic[i][f],dic[i][s]],l)
         
                 return final_labels,ff
                     
@@ -873,7 +885,8 @@ class PersonalDataTopicAnalysis:
 
         f_corpusdata_visited=pre_process_url(titles)
         title_cleaned=clean_words(f_corpusdata_visited['titles'])
-
+        
+     
         final_entries=[]
         final_entries=final_searched.copy()
         final_entries.extend(title_cleaned) 
@@ -970,4 +983,23 @@ class PersonalDataTopicAnalysis:
         except AttributeError:
             print('error parsing data frame')
         
+
+
+# In[16]:
+
+
+prova=PersonalDataTopicAnalysis('/home/janz/keras/datas/csv/chrome/Search.csv')
+prova.execute()
+
+
+# In[17]:
+
+
+tt=prova.info_table('Dec','2017','nmf')
+
+
+# In[18]:
+
+
+tt
 
