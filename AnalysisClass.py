@@ -120,7 +120,7 @@ class get_splitted_time:
             return tempFrame
 
 
-# In[15]:
+# In[8]:
 
 
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
@@ -239,7 +239,7 @@ class PersonalDataTopicAnalysis:
                     dic[key]+=int(tmp[1])
         
                 max_v=max(dic.values())
-                min_v=min(dic.values())
+                min_v=0
     
                 dic={k: normalize(v,max_v,min_v) for k,v in dic.items()}
                 return collections.OrderedDict(sorted(dic.items()))  
@@ -453,9 +453,9 @@ class PersonalDataTopicAnalysis:
     #Main function
     def generate_topic(self,month,year,alg):
         
-        max_features=300
-        n_top_word=20
-        self.n_comp=8
+        max_features=100
+        n_top_word=22
+        self.n_comp=7
         
         stopWords=stopwords.words(['english','italian'])
         stopWords.append('google')
@@ -615,8 +615,8 @@ class PersonalDataTopicAnalysis:
         #
         #generate tfidf of the given corpus (for NMF)
         #
-        def get_tfidf(corpus,ngram,max_features):
-            tfidf=TfidfVectorizer(max_features=max_features,max_df=0.9,lowercase=False,min_df=2,stop_words='english',analyzer='word',token_pattern='(?u)\\w{4,40}\\b',ngram_range=ngram)
+        def get_tfidf(corpus,ngram):
+            tfidf=TfidfVectorizer(max_df=0.9,lowercase=False,min_df=2,stop_words='english',analyzer='word',token_pattern='(?u)\\w{4,40}\\b',ngram_range=ngram)
             tfidf_matrix=tfidf.fit_transform(corpus)
             #print(tfidf_matrix.shape)
             #print(tfidf_matrix[:5])
@@ -626,8 +626,8 @@ class PersonalDataTopicAnalysis:
         #
         #generating tf (for LDA)
         #
-        def get_tf(corpus,ngram,max_features):
-            tf=CountVectorizer(max_df=0.97, min_df=2,max_features=max_features,stop_words='english',token_pattern='(?u)\\w{4,40}\\b',ngram_range=ngram)
+        def get_tf(corpus,ngram):
+            tf=CountVectorizer(max_df=0.97, min_df=2,stop_words='english',token_pattern='(?u)\\w{4,40}\\b',ngram_range=ngram)
             tf_matrix=tf.fit_transform(corpus)
             
             return tf_matrix,tf
@@ -689,22 +689,25 @@ class PersonalDataTopicAnalysis:
         def get_candidate(table):
             
             
-            def update_dic(dic,w):
+            def update_dic(dic,w,n_cat):
                 inc=0
                 if len(w.split(' '))>1:
-                    inc=1.5
+                    inc=1.0
+                elif w=='song' or w=='band' or w=='album':
+                    inc=0.2
                 else:
                     inc=1.0
                     
                 if len(w)>3 and not re.match(r'^[0-9]+[\w \s]*',w):
                     if w in dic:
                         dic[w]+=inc
-                    else:
+                    elif n_cat>0:
+                        n_cat-=1
                         dic[w]=inc
             
-                return
+                return n_cat
             
-            def operate_on_label(dic_to_operate,w):
+            def operate_on_label(dic_to_operate,w,n_cat):
                 punctuation = set(string.punctuation)
                 if '(' in w and w.endswith(')') and len(w.split(' '))<4:
                     ww=w[w.find('(')+1:w.find(')')]
@@ -713,20 +716,24 @@ class PersonalDataTopicAnalysis:
                         if len(list_w)<3:
                             if len(list_w)>1:
                                 if 'song' in list_w:
-                                    update_dic(dic,'song')
+                                    n_cat=update_dic(dic,'song',n_cat)
+                                elif 'band' in list_w:
+                                    n_cat=update_dic(dic,'band',n_cat)
+                                elif 'album' in list_w:
+                                    n_cat=update_dic(dic,'album',n_cat)
                                 else:
                                     w_el=[k for k in list_w if not k.isdigit()]
                                     w_el.append(' '.join(w_el))
                                     for ww in w_el:
                                         ww = "".join([i.lower() for i in ww if i not in punctuation])
-                                        update_dic(dic,ww)
+                                        n_cat=update_dic(dic,ww,n_cat)
                             else:
                                 ww=ww = "".join([i.lower() for i in list_w if i not in punctuation])
-                                update_dic(dic,ww)
+                                n_cat=update_dic(dic,ww,n_cat)
                                 
                         list_w.clear()
 
-                return
+                return n_cat
             
             def control_final_labels(dic):
 
@@ -769,7 +776,11 @@ class PersonalDataTopicAnalysis:
                         index_s+=1
                         s=tt[index_s]
                 
-                    final_labels[i]=[f,s]
+                    
+                    if dic[i][s]>1:
+                        final_labels[i]=[f,s]
+                    else:
+                        final_labels[i]=[f]
                     #take the freq of the top candidates, plus the total number of candidates
                     ff[i]=([dic[i][f],dic[i][s]],l)
         
@@ -786,21 +797,22 @@ class PersonalDataTopicAnalysis:
                 n_disamb=0
                 n_miss=0
                 dic={}
+                n_cat=18
             #for every element in the cluster
                 for k in table.iloc[tt]:
                 #print('###'+k)
                     try:
                         l=wiki.page(k)
-                        for w in l.links[:13]:
-                            operate_on_label(dic,w)
-                        for w in l.categories[:12]:
-                            operate_on_label(dic,w)
+                        for w in l.links[:15]:
+                            n_cat=operate_on_label(dic,w,n_cat)
+                        for w in l.categories[:15]:
+                            n_cat=operate_on_label(dic,w,n_cat)
                             
                     except DisambiguationError as e:
                         n_disamb+=1
                     #print('*** disamb')
-                        for w in e.options[:12]:
-                            operate_on_label(dic,w)
+                        for w in e.options[:15]:
+                            n_cat=operate_on_label(dic,w,n_cat)
                                 
                     except PageError:
                         n_miss+=1
@@ -817,49 +829,36 @@ class PersonalDataTopicAnalysis:
             final_labels,cat_dic_freq=control_final_labels(cat_dic)
             
             return final_labels,cat_dic_freq,[cat_dissamb,cat_not_found]
+        def truncate(f, n):
+        #Truncates/pads a float f to n decimal places without rounding
+            s = '{}'.format(f)
+            if 'e' in s or 'E' in s:
+                return '{0:.{1}f}'.format(f, n)
+            i, p, d = s.partition('.')
+            return float('.'.join([i, (d+'0'*n)[:n]]))
         
         #
         #
         #calculate topic labeling precision
-        def calculate_precision(freq_cluster,n_comp,pp):
-            clusters_precision=[]
+        def calculate_precision(freq,n_comp):
+    
+            acc_vect=[]
             s_t=0
-            for i,k in freq_cluster.items():
+            for i,k in freq.items():
                 y=sum(k[0][:2])
                 s_perc=y/k[1]
-                s_t+=s_perc
-                if pp==1:
-                    print('topic {}'.format(i))
-                    print('coh {}'.format(s_perc*100))
-                    print('#####')
+                acc_vect.append(truncate(s_perc*100,2))
+            return acc_vect
     
-                #print('tot coh {}'.format(s_t/n_comp*100))
-                clusters_precision.append(s_t/n_comp*100)
-            return clusters_precision
         #
         #
         #return disamb and page not found total percentage
-        def calculate_failure_rate(fail_vec,n_el):
-            clusters_failure=[]
-            clusters_disamb=[]
-            #n disamb for each cluster
-            for k,v in fail_vec[0].items():
-                perc_disamb_topic=v/n_el
-                #print('topic {}, perc disamb {}'.format(k,perc_disamb_topic*100))
-                clusters_disamb.append(perc_disamb_topic*100)
-                
-    
-            #n not found for each cluster
-            for k,v in fail_vec[1].items():
+        def calculate_failure_rate(f_vec,n_el):
+            failure_v=[]
+            for k,v in f_vec[1].items():
                 perc_failure_topic=v/n_el
-                #print('topic {}, perc failure {}'.format(k,perc_failure_topic*100))
-                clusters_failure.append(perc_failure_topic*100)
-                
-            i=0
-            f=[]
-            for i in range(0,self.n_comp):
-                f.append((clusters_disamb[i],clusters_failure[i]))
-            return f
+                failure_v.append(truncate(perc_failure_topic*100,2))
+            return failure_v    
                                                          
         #
         ##############Topic: Main part########à#######
@@ -895,7 +894,7 @@ class PersonalDataTopicAnalysis:
         
         if alg == 'NMF' or alg == 'nmf':
             print('generating tfidf factor...')
-            tfidf_matrix,tfidf=get_tfidf(final_entries,(1,2),max_features)
+            tfidf_matrix,tfidf=get_tfidf(final_entries,(1,2))
             tfidf_table1=None
             tfidf_table1=get_table(tfidf_matrix,tfidf.get_feature_names())
         
@@ -909,7 +908,7 @@ class PersonalDataTopicAnalysis:
             
         elif alg == 'LDA' or alg == 'lda':
             print('generating tf factor...')
-            tf_matrix,tf=get_tf(final_entries,(2,2),max_features)
+            tf_matrix,tf=get_tf(final_entries,(2,2))
             tf_table1=None
             tf_table1=get_table(tf_matrix,tf.get_feature_names())
         
@@ -931,9 +930,9 @@ class PersonalDataTopicAnalysis:
         tableTopic['labels']=topic_candidates.values()
         tableTopic['year']=year
         tableTopic['month']=month
-        #print(tableTopic)
-        self.precision=calculate_precision(f,self.n_comp,0)
-        self.failure=calculate_failure_rate(failure_val,max_features)
+        ####here
+        self.precision=calculate_precision(f,self.n_comp)
+        self.failure=calculate_failure_rate(failure_val,n_top_word)
         return tableTopic
     
     
