@@ -120,7 +120,7 @@ class get_splitted_time:
             return tempFrame
 
 
-# In[8]:
+# In[37]:
 
 
 #Class that performs the analysis on text data generated from google or facebook, it returns a table with the
@@ -688,51 +688,45 @@ class PersonalDataTopicAnalysis:
         
         def get_candidate(table):
             
-            
-            def update_dic(dic,w,n_cat):
-                inc=0
-                if len(w.split(' '))>1:
-                    inc=1.0
-                elif w=='song' or w=='band' or w=='album':
-                    inc=0.2
+            def to_sing(s):
+                if s[-1] == 's' and s[-2]!='s':
+                    return s[:-1]
                 else:
-                    inc=1.0
-                    
-                if len(w)>3 and not re.match(r'^[0-9]+[\w \s]*',w):
-                    if w in dic:
-                        dic[w]+=inc
-                    elif n_cat>0:
-                        n_cat-=1
-                        dic[w]=inc
+                    return s
+                
+            def n_grams(s):
+                l=list(itertools.combinations(s,2))
+                f=[]
+                for el in l:
+                    f.append(' '.join(el))
+                return f
+            
+            def update_dic(dic,ww,inc,n_cat):
+                ww=ww.lower()
+                ww=to_sing(ww)
+                if ww in dic:
+                    dic[ww]+=inc
+                elif n_cat>0:
+                    n_cat-=1
+                    dic[ww]=inc
             
                 return n_cat
             
-            def operate_on_label(dic_to_operate,w,n_cat):
-                punctuation = set(string.punctuation)
-                if '(' in w and w.endswith(')') and len(w.split(' '))<4:
-                    ww=w[w.find('(')+1:w.find(')')]
-                    if len(ww)>3 and 'disambiguation' not in ww and not re.match(r'^[0-9]+[\w \s]*',ww): 
-                        list_w=ww.split(' ')
-                        if len(list_w)<3:
-                            if len(list_w)>1:
-                                if 'song' in list_w:
-                                    n_cat=update_dic(dic,'song',n_cat)
-                                elif 'band' in list_w:
-                                    n_cat=update_dic(dic,'band',n_cat)
-                                elif 'album' in list_w:
-                                    n_cat=update_dic(dic,'album',n_cat)
-                                else:
-                                    w_el=[k for k in list_w if not k.isdigit()]
-                                    w_el.append(' '.join(w_el))
-                                    for ww in w_el:
-                                        ww = "".join([i.lower() for i in ww if i not in punctuation])
-                                        n_cat=update_dic(dic,ww,n_cat)
-                            else:
-                                ww=ww = "".join([i.lower() for i in list_w if i not in punctuation])
-                                n_cat=update_dic(dic,ww,n_cat)
-                                
-                        list_w.clear()
-
+            def operate_on_label(dic,ww,n_cat):
+                if len(ww)>3 and 'disambiguation' not in ww and not re.match(r'^[0-9]+[\w \s]*',ww): 
+                    if len(ww.split(' '))>1 and len(ww.split(' '))<3:
+                        #category of multiple words
+                        n_cat=update_dic(dic,ww,1.1,n_cat)  
+                        w_list=list(ww.split(' '))
+                        #l=n_grams(ww.split(' '))
+                        #w_list.extend(l)
+                        for www in w_list:
+                            n_cat=update_dic(dic,www,0.6,n_cat)
+                        w_list.clear()
+                    else:
+                        #single word category
+                        n_cat=update_dic(dic,ww,1,n_cat)
+        
                 return n_cat
             
             def control_final_labels(dic):
@@ -762,7 +756,7 @@ class PersonalDataTopicAnalysis:
     
                     #if one candidate label is cointained in another
                     #if the first one is contained in the second one
-                    if s.find(f)>-1:
+                    elif s.find(f)>-1:
                         l=l-1
                         tt.remove(f)
                         f=s
@@ -777,13 +771,28 @@ class PersonalDataTopicAnalysis:
                         s=tt[index_s]
                 
                     
-                    if dic[i][s]>1:
-                        final_labels[i]=[f,s]
+                    #setting treshold for checking label validity
+                    if len(s.split(' '))>1:
+                        tr=1.1
                     else:
+                        tr=1
+                    if len(f.split(' '))>1:
+                        tr1=1.1
+                    else:
+                        tr1=1
+            
+                    if dic[i][s]>tr:
+                        final_labels[i]=[f,s]
+                    elif dic[i][f]>tr1:
                         final_labels[i]=[f]
-                    #take the freq of the top candidates, plus the total number of candidates
-                    ff[i]=([dic[i][f],dic[i][s]],l)
-        
+                    else:
+                        final_labels[i]=None
+                
+                    if final_labels is not None:
+                        ff[i]=([dic[i][f],dic[i][s]],l)
+                    else:
+                        ff[i]=(0,0,0)
+                        
                 return final_labels,ff
                     
             wiki= MediaWiki()
@@ -797,28 +806,36 @@ class PersonalDataTopicAnalysis:
                 n_disamb=0
                 n_miss=0
                 dic={}
-                n_cat=18
+                n_cat=30
             #for every element in the cluster
                 for k in table.iloc[tt]:
                 #print('###'+k)
                     try:
                         l=wiki.page(k)
-                        for w in l.links[:15]:
-                            n_cat=operate_on_label(dic,w,n_cat)
-                        for w in l.categories[:15]:
-                            n_cat=operate_on_label(dic,w,n_cat)
+                        for w in l.links[:21]:
+                            if '(' in w and w.endswith(')'):
+                                ww=w[w.find('(')+1:w.find(')')]
+                                if len(ww.split(' '))<3:
+                                    n_cat=operate_on_label(dic,ww,n_cat)
+                        for w in l.categories[:21]:
+                            if '(' in w and w.endswith(')'):
+                                ww=w[w.find('(')+1:w.find(')')]
+                                if len(ww.split(' '))<3:
+                                    n_cat=operate_on_label(dic,ww,n_cat)
+                            elif len(w.split(' '))<4 and len(w)>3:
+                                    n_cat=operate_on_label(dic,w,n_cat)
                             
                     except DisambiguationError as e:
                         n_disamb+=1
-                    #print('*** disamb')
-                        for w in e.options[:15]:
-                            n_cat=operate_on_label(dic,w,n_cat)
+                        for w in e.options[:21]:
+                            if '(' in w and w.endswith(')'):
+                                ww=w[w.find('(')+1:w.find(')')]
+                                if len(ww.split(' '))<3:
+                                    n_cat=operate_on_label(dic,ww,n_cat)
                                 
                     except PageError:
                         n_miss+=1
                                                             
-            #print(list(dic.items())[:3])
-            #return only the title of topic->no freq
                 cat_dic[tt]=OrderedDict(sorted(dic.items(),key=lambda x:x[1],reverse=True))
                 print(cat_dic[tt])
                 #cat_dic_freq[tt]=(list(OrderedDict(sorted(dic.items(),key=lambda x:x[1],reverse=True)).values())[:2],len(dic))
@@ -964,9 +981,10 @@ class PersonalDataTopicAnalysis:
             print('time ellapsed for generatin locations :{}'.format(t2-t1))
         else:
             print('the following table does not support location generation')
-      
-        tableTopic['words']=tableTopic['words'].apply(lambda x:','.join(x))
-        tableTopic['labels']=tableTopic['labels'].apply(lambda x:','.join(x))
+        
+        
+        tableTopic['words']=tableTopic['words'].apply(lambda x: ','.join(x))
+        tableTopic['labels']=tableTopic['labels'].apply(lambda x:','.join(x) if (x is not None) else None)
         return tableTopic
             
            
